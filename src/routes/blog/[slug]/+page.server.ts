@@ -1,23 +1,20 @@
 import type { PageServerLoad } from './$types';
-import { getPostBySlug, getAllPosts } from '$lib/server/posts';
 import { error } from '@sveltejs/kit';
-import type { EntryGenerator } from './$types';
 
-export const prerender = true;
-
-export const entries: EntryGenerator = async () => {
-	const posts = await getAllPosts('published');
-	return posts.map(post => ({ slug: post.slug }));
-};
-
-export const load: PageServerLoad = async ({ params }) => {
-	const post = await getPostBySlug(params.slug);
-	
-	if (!post || post.status !== 'published') {
-		error(404, 'Post not found');
+export const load: PageServerLoad = async ({ params, fetch }) => {
+	try {
+		const response = await fetch('/data/posts.json');
+		if (response.ok) {
+			const data = await response.json();
+			const post = data.posts.find((p: any) => p.slug === params.slug);
+			
+			if (post && post.status === 'published') {
+				return { post };
+			}
+		}
+	} catch (e) {
+		console.error('Error loading post:', e);
 	}
 	
-	return {
-		post
-	};
+	error(404, 'Post not found');
 };

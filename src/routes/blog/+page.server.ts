@@ -1,12 +1,19 @@
 import type { PageServerLoad } from './$types';
-import { getAllPosts } from '$lib/server/posts';
 
-export const prerender = true;
-
-export const load: PageServerLoad = async () => {
-	const posts = await getAllPosts('published');
+export const load: PageServerLoad = async ({ fetch }) => {
+	try {
+		const response = await fetch('/data/posts.json');
+		if (response.ok) {
+			const data = await response.json();
+			return {
+				posts: data.posts || []
+			};
+		}
+	} catch (error) {
+		console.error('Error loading posts:', error);
+	}
 	
 	return {
-		posts
+		posts: []
 	};
 };
