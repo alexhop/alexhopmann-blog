@@ -1,11 +1,18 @@
 #!/usr/bin/env node
-import { readFileSync, readdirSync, statSync } from 'fs';
-import { join, basename } from 'path';
+import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
+import { join, basename, dirname } from 'path';
 import { CosmosClient } from '@azure/cosmos';
 import { BlobServiceClient } from '@azure/storage-blob';
 import { marked } from 'marked';
 import { JSDOM } from 'jsdom';
 import DOMPurify from 'dompurify';
+import { fileURLToPath } from 'url';
+import { config as dotenvConfig } from 'dotenv';
+
+// Load environment variables
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenvConfig({ path: join(__dirname, '..', '.env') });
 
 // Configuration
 const config = {
@@ -19,8 +26,22 @@ const config = {
 		connectionString: `DefaultEndpointsProtocol=https;AccountName=${process.env.AZURE_STORAGE_ACCOUNT_NAME};AccountKey=${process.env.AZURE_STORAGE_ACCOUNT_KEY};EndpointSuffix=core.windows.net`,
 		containerName: process.env.AZURE_STORAGE_CONTAINER_NAME || 'blog-media'
 	},
-	sourcePath: '../old_alexhopmann.com/docroot'
+	sourcePath: join(__dirname, '../../old_alexhopmann.com/docroot')
 };
+
+// Validate configuration
+if (!config.cosmos.endpoint || !config.cosmos.key) {
+	console.error('Error: Cosmos DB configuration is missing. Please check your .env file.');
+	console.error('COSMOS_ENDPOINT:', config.cosmos.endpoint ? 'Set' : 'Missing');
+	console.error('COSMOS_KEY:', config.cosmos.key ? 'Set' : 'Missing');
+	process.exit(1);
+}
+
+if (!existsSync(config.sourcePath)) {
+	console.error(`Error: Source path does not exist: ${config.sourcePath}`);
+	console.error('Please ensure the old_alexhopmann.com directory is in the parent directory.');
+	process.exit(1);
+}
 
 interface LegacyPost {
 	title: string;
