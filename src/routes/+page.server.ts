@@ -5,8 +5,9 @@ export const prerender = true;
 
 export const load: PageServerLoad = async () => {
 	const posts = await getAllPosts('published');
+	const recentPosts = posts.slice(0, 3);
 	
 	return {
-		posts
+		recentPosts
 	};
 };

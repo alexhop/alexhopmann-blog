@@ -1,19 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import type { PageData } from './$types';
 	
-	let recentPosts: any[] = [];
-	
-	onMount(async () => {
-		try {
-			const response = await fetch('/api/posts?status=published');
-			if (response.ok) {
-				const data = await response.json();
-				recentPosts = data.posts.slice(0, 3);
-			}
-		} catch (error) {
-			console.error('Failed to load recent posts:', error);
-		}
-	});
+	export let data: PageData;
+	$: recentPosts = data.recentPosts || [];
 	
 	function formatDate(date: Date | string) {
 		return new Date(date).toLocaleDateString('en-US', {
