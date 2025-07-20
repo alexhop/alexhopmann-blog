@@ -1,0 +1,50 @@
+{
+  "name": "alexhopmann-blog",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "migrate:content": "tsx scripts/migrate-content.ts",
+    "migrate:wordpress": "tsx scripts/migrate-wordpress.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@sveltejs/adapter-static": "^3.0.8",
+    "@sveltejs/kit": "^2.25.1",
+    "@sveltejs/vite-plugin-svelte": "^6.1.0",
+    "@types/node": "^24.0.15",
+    "@types/turndown": "^5.0.5",
+    "mysql2": "^3.14.2",
+    "svelte": "^5.36.8",
+    "svelte-check": "^4.3.0",
+    "tslib": "^2.8.1",
+    "tsx": "^4.20.3",
+    "turndown": "^7.2.0",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.5"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.4.1",
+    "@azure/identity": "^4.10.2",
+    "@azure/msal-browser": "^4.15.0",
+    "@azure/msal-node": "^3.6.3",
+    "@azure/storage-blob": "^12.27.0",
+    "@tiptap/core": "^3.0.7",
+    "@tiptap/extension-image": "^3.0.7",
+    "@tiptap/extension-link": "^3.0.7",
+    "@tiptap/pm": "^3.0.7",
+    "@tiptap/starter-kit": "^3.0.7",
+    "@types/jsdom": "^21.1.7",
+    "dompurify": "^3.2.6",
+    "jsdom": "^26.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "marked": "^16.1.1"
+  }
+}
