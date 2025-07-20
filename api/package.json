@@ -2,25 +2,13 @@
   "name": "alexhopmann-blog-api",
   "version": "1.0.0",
   "description": "Azure Functions API for Alex Hopmann's Blog",
-  "main": "dist/index.js",
+  "main": "index.js",
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w",
     "start": "func start",
     "test": "echo \"No tests yet\""
   },
   "dependencies": {
     "@azure/cosmos": "^4.4.1",
-    "@azure/identity": "^4.10.2",
-    "@azure/storage-blob": "^12.27.0",
-    "@azure/functions": "^4.0.0",
-    "jsonwebtoken": "^9.0.2",
-    "dompurify": "^3.2.6",
-    "jsdom": "^26.1.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.x",
-    "@types/jsonwebtoken": "^9.0.2",
-    "typescript": "^5.0.0"
+    "@azure/storage-blob": "^12.27.0"
   }
 }

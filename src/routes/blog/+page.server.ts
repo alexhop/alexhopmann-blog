@@ -1,10 +1,20 @@
 import type { PageServerLoad } from './$types';
-import { getAllPosts } from '$lib/server/posts';
 
-export const load: PageServerLoad = async () => {
-	const posts = await getAllPosts('published');
+export const load: PageServerLoad = async ({ fetch }) => {
+	try {
+		// Fetch from Azure Functions API
+		const response = await fetch('/api/posts');
+		if (response.ok) {
+			const data = await response.json();
+			return {
+				posts: data.posts || []
+			};
+		}
+	} catch (error) {
+		console.error('Error fetching posts:', error);
+	}
 	
 	return {
-		posts
+		posts: []
 	};
 };
