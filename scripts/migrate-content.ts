@@ -64,12 +64,54 @@ const containerClient = blobServiceClient.getContainerClient(config.storage.cont
 function parseLegacyPost(filePath: string): LegacyPost | null {
 	try {
 		const content = readFileSync(filePath, 'utf-8');
-		const dom = new JSDOM(content);
-		const document = dom.window.document;
 		
-		// Extract title
-		const titleElement = document.querySelector('h1, h2, title');
-		const title = titleElement?.textContent?.trim() || basename(filePath, '.htm');
+		// Try to extract from custom XML-like format first
+		const headerMatch = content.match(/<header>(.*?)<\/header>/s);
+		const contentMatch = content.match(/<content>(.*?)<\/content>/s);
+		const topicMatch = content.match(/<topic\s+name="([^"]+)"(?:\s+sub="([^"]+)")?\s*\/>/);
+		
+		let title: string;
+		let postContent: string;
+		let category: string | undefined;
+		
+		if (headerMatch && contentMatch) {
+			// Use the custom format
+			title = headerMatch[1].trim();
+			postContent = contentMatch[1].trim();
+			category = topicMatch ? topicMatch[1] : undefined;
+		} else {
+			// Fall back to DOM parsing
+			const dom = new JSDOM(content);
+			const document = dom.window.document;
+			
+			// Try to find title in header-pagesub class first
+			let titleElement = document.querySelector('p.header-pagesub');
+			if (!titleElement) {
+				// Try other selectors
+				titleElement = document.querySelector('h1.DateHeader + p.header-pagesub, h2, .header');
+			}
+			
+			title = titleElement?.textContent?.trim() || '';
+			
+			// If still no title or it's just the generic site name, use the filename
+			if (!title || title === 'Alex Hopmann\'s Web Site') {
+				title = basename(filePath, '.htm').replace(/article\s+/, '').replace(/-/g, ' ');
+			}
+			
+			// Extract content - look for the main content area
+			const centerColumn = document.querySelector('td.centercolumn');
+			if (centerColumn) {
+				// Remove navigation and header elements
+				const dateHeader = centerColumn.querySelector('h1.DateHeader');
+				const pageSub = centerColumn.querySelector('p.header-pagesub');
+				if (dateHeader) dateHeader.remove();
+				if (pageSub) pageSub.remove();
+				postContent = centerColumn.innerHTML || '';
+			} else {
+				const bodyElement = document.querySelector('body');
+				postContent = bodyElement?.innerHTML || content;
+			}
+		}
 		
 		// Extract date from filename (article YYYY-MM-DD.htm)
 		const dateMatch = basename(filePath).match(/(\d{4})-(\d{2})-(\d{2})/);
@@ -77,21 +119,21 @@ function parseLegacyPost(filePath: string): LegacyPost | null {
 			? new Date(parseInt(dateMatch[1]), parseInt(dateMatch[2]) - 1, parseInt(dateMatch[3]))
 			: new Date(statSync(filePath).mtime);
 		
-		// Extract content
-		const bodyElement = document.querySelector('body');
-		const contentHtml = bodyElement?.innerHTML || content;
-		
-		// Find images
+		// Find images using DOM parser
+		const dom = new JSDOM(content);
 		const images: string[] = [];
-		document.querySelectorAll('img').forEach(img => {
+		dom.window.document.querySelectorAll('img').forEach(img => {
 			const src = img.getAttribute('src');
-			if (src) images.push(src);
+			if (src && !src.startsWith('http://') && !src.startsWith('https://')) {
+				images.push(src);
+			}
 		});
 		
 		return {
 			title,
-			content: contentHtml,
+			content: postContent,
 			date,
+			category,
 			images
 		};
 	} catch (error) {
@@ -103,12 +145,28 @@ function parseLegacyPost(filePath: string): LegacyPost | null {
 // Upload image to blob storage
 async function uploadImage(localPath: string, originalUrl: string): Promise<string> {
 	try {
-		const fullPath = join(config.sourcePath, originalUrl);
+		// Skip external URLs
+		if (originalUrl.startsWith('http://') || originalUrl.startsWith('https://')) {
+			return originalUrl;
+		}
+		
+		const fullPath = join(localPath, originalUrl);
+		
+		// Check if file exists
+		if (!existsSync(fullPath)) {
+			console.warn(`Image not found: ${fullPath}`);
+			return originalUrl;
+		}
+		
 		const imageData = readFileSync(fullPath);
 		const blobName = `migrated/${Date.now()}-${basename(originalUrl)}`;
 		
 		const blockBlobClient = containerClient.getBlockBlobClient(blobName);
-		await blockBlobClient.upload(imageData, imageData.length);
+		await blockBlobClient.upload(imageData, imageData.length, {
+			blobHTTPHeaders: {
+				blobContentType: getContentType(originalUrl)
+			}
+		});
 		
 		return blockBlobClient.url;
 	} catch (error) {
@@ -117,14 +175,28 @@ async function uploadImage(localPath: string, originalUrl: string): Promise<stri
 	}
 }
 
+// Get content type from file extension
+function getContentType(filename: string): string {
+	const ext = filename.toLowerCase().split('.').pop();
+	const types: { [key: string]: string } = {
+		'jpg': 'image/jpeg',
+		'jpeg': 'image/jpeg',
+		'png': 'image/png',
+		'gif': 'image/gif',
+		'webp': 'image/webp',
+		'svg': 'image/svg+xml'
+	};
+	return types[ext || ''] || 'application/octet-stream';
+}
+
 // Process content and update image URLs
-async function processContent(content: string, images: string[]): Promise<string> {
+async function processContent(content: string, images: string[], sourcePath: string): Promise<string> {
 	let processedContent = content;
 	
 	// Upload images and replace URLs
 	for (const imageUrl of images) {
 		try {
-			const newUrl = await uploadImage(config.sourcePath, imageUrl);
+			const newUrl = await uploadImage(sourcePath, imageUrl);
 			processedContent = processedContent.replace(
 				new RegExp(imageUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
 				newUrl
@@ -138,8 +210,8 @@ async function processContent(content: string, images: string[]): Promise<string
 	const window = new JSDOM('').window;
 	const purify = DOMPurify(window);
 	const cleanHtml = purify.sanitize(processedContent, {
-		ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'i', 'b', 'a', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code'],
-		ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel']
+		ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'i', 'b', 'a', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'table', 'tr', 'td', 'th', 'tbody', 'thead'],
+		ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel', 'class', 'style']
 	});
 	
 	return cleanHtml;
@@ -154,8 +226,9 @@ function generateSlug(title: string): string {
 }
 
 // Migrate a single post
-async function migratePost(post: LegacyPost) {
-	const processedContent = await processContent(post.content, post.images);
+async function migratePost(post: LegacyPost, filePath: string) {
+	const sourceDir = dirname(filePath);
+	const processedContent = await processContent(post.content, post.images, sourceDir);
 	const slug = generateSlug(post.title);
 	
 	// Extract excerpt (first paragraph or first 200 chars)
@@ -218,7 +291,7 @@ async function migrate() {
 		}
 		
 		try {
-			const blogPost = await migratePost(legacyPost);
+			const blogPost = await migratePost(legacyPost, filePath);
 			
 			// Check if post already exists
 			const { resources } = await container.items
