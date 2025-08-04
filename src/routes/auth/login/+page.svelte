@@ -16,8 +16,12 @@
 					Access denied. Only authorized users can access the admin area.
 				{:else if data.error === 'rate_limit'}
 					Too many login attempts. Please try again later.
+				{:else if data.error === 'token_exchange'}
+					Authentication failed: Unable to exchange authorization code. Please try again.
+				{:else if data.error === 'auth_failed'}
+					Authentication failed. Please check your Microsoft account and try again.
 				{:else}
-					Login failed. Please try again.
+					Login failed. Please try again. (Error: {data.error})
 				{/if}
 			</div>
 		{/if}

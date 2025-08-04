@@ -70,9 +70,17 @@ export const GET: RequestHandler = async (event) => {
 		});
 		
 		redirect(303, '/admin');
-	} catch (err) {
+	} catch (err: any) {
 		console.error('Auth callback error:', err);
-		redirect(303, '/auth/login?error=1');
+		console.error('Error details:', {
+			message: err.message,
+			stack: err.stack,
+			response: err.response
+		});
+		// Pass more specific error information
+		const errorType = err.message?.includes('token') ? 'token_exchange' : 
+		                  err.message?.includes('unauthorized') ? 'unauthorized' : 'auth_failed';
+		redirect(303, `/auth/login?error=${errorType}`);
 	}
 };
 
