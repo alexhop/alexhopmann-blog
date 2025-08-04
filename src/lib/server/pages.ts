@@ -59,7 +59,7 @@ export async function getPages(status?: 'draft' | 'published'): Promise<Page[]> 
 			parameters.push({ name: '@status', value: status });
 		}
 		
-		query += ' ORDER BY c.order ASC, c.createdAt DESC';
+		query += ' ORDER BY c.createdAt DESC';
 		
 		const { resources } = await container.items
 			.query({ query, parameters })
@@ -80,7 +80,7 @@ export async function getPagesForSidebar(): Promise<Page[]> {
 	try {
 		await ensureContainer();
 		
-		const query = 'SELECT * FROM c WHERE c.status = @status AND c.showInSidebar = @showInSidebar ORDER BY c.order ASC, c.title ASC';
+		const query = 'SELECT * FROM c WHERE c.status = @status AND c.showInSidebar = @showInSidebar ORDER BY c.title ASC';
 		const parameters = [
 			{ name: '@status', value: 'published' },
 			{ name: '@showInSidebar', value: true }
@@ -130,21 +130,37 @@ export async function getPageById(id: string): Promise<Page | null> {
 }
 
 export async function createPage(page: Omit<Page, 'id' | 'createdAt' | 'updatedAt'>): Promise<Page> {
-	await ensureContainer();
-	
-	const id = generateId();
-	const now = new Date();
-	
-	const newPage: Page = {
-		...page,
-		id,
-		createdAt: now,
-		updatedAt: now,
-		publishedAt: page.status === 'published' ? now : undefined
-	};
-	
-	const { resource } = await container.items.create(newPage);
-	return formatPage(resource!);
+	try {
+		await ensureContainer();
+		
+		const id = generateId();
+		const now = new Date();
+		
+		const newPage: Page = {
+			...page,
+			id,
+			createdAt: now,
+			updatedAt: now,
+			publishedAt: page.status === 'published' ? now : undefined
+		};
+		
+		console.log('Creating page with ID:', id);
+		console.log('Page data:', JSON.stringify(newPage, null, 2));
+		
+		const { resource } = await container.items.create(newPage);
+		console.log('Page created successfully:', resource?.id);
+		
+		return formatPage(resource!);
+	} catch (error: any) {
+		console.error('Error in createPage:', error);
+		console.error('Error details:', {
+			message: error.message,
+			code: error.code,
+			statusCode: error.statusCode,
+			body: error.body
+		});
+		throw error;
+	}
 }
 
 export async function updatePage(id: string, updates: Partial<Page>): Promise<Page | null> {

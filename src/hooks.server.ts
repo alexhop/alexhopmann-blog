@@ -1,6 +1,10 @@
 import type { Handle } from '@sveltejs/kit';
 import { verifyToken } from '$lib/server/auth';
 import { telemetry } from '$lib/server/telemetry';
+import { initializePagesContainer } from '$lib/server/pages';
+
+// Initialize pages container on startup
+initializePagesContainer().catch(console.error);
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const startTime = performance.now();

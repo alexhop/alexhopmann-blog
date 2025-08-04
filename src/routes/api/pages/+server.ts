@@ -63,8 +63,18 @@ export const POST: RequestHandler = async (event) => {
 		});
 		
 		return json(page, { status: 201 });
-	} catch (error) {
+	} catch (error: any) {
 		console.error('Error creating page:', error);
-		return json({ error: 'Failed to create page' }, { status: 500 });
+		console.error('Error details:', {
+			message: error.message,
+			code: error.code,
+			statusCode: error.statusCode,
+			body: error.body
+		});
+		return json({ 
+			error: 'Failed to create page',
+			details: error.message,
+			code: error.code
+		}, { status: 500 });
 	}
 };

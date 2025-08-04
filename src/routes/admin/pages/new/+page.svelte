@@ -54,9 +54,14 @@
 			} else {
 				const data = await response.json();
 				error = data.error || 'Failed to create page';
+				if (data.details) {
+					error += `: ${data.details}`;
+				}
+				console.error('Page creation failed:', data);
 			}
 		} catch (err) {
-			error = 'Error creating page';
+			console.error('Error creating page:', err);
+			error = `Error creating page: ${err.message || err}`;
 		} finally {
 			saving = false;
 		}
