@@ -1,16 +1,13 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
+import { getPostBySlug } from '$lib/server/posts';
 
-export const load: PageServerLoad = async ({ params, fetch }) => {
+export const load: PageServerLoad = async ({ params }) => {
 	try {
-		const response = await fetch('/data/posts.json');
-		if (response.ok) {
-			const data = await response.json();
-			const post = data.posts.find((p: any) => p.slug === params.slug);
-			
-			if (post && post.status === 'published') {
-				return { post };
-			}
+		const post = await getPostBySlug(params.slug);
+		
+		if (post && post.status === 'published') {
+			return { post };
 		}
 	} catch (e) {
 		console.error('Error loading post:', e);

@@ -12,7 +12,13 @@
 		
 		{#if data.error}
 			<div class="error">
-				Login failed. Please try again.
+				{#if data.error === 'unauthorized'}
+					Access denied. Only authorized users can access the admin area.
+				{:else if data.error === 'rate_limit'}
+					Too many login attempts. Please try again later.
+				{:else}
+					Login failed. Please try again.
+				{/if}
 			</div>
 		{/if}
 		

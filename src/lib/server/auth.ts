@@ -61,7 +61,8 @@ export async function createUser(userData: Omit<User, 'id' | 'createdAt' | 'upda
 export async function updateUser(id: string, email: string, updates: Partial<User>): Promise<User> {
 	const container = await getContainer('users');
 	
-	const { resource: existingUser } = await container.item(id, email).read<User>();
+	// Users container uses /id as partition key
+	const { resource: existingUser } = await container.item(id, id).read<User>();
 	if (!existingUser) {
 		throw new Error('User not found');
 	}
@@ -74,7 +75,7 @@ export async function updateUser(id: string, email: string, updates: Partial<Use
 		updatedAt: new Date()
 	};
 	
-	const { resource } = await container.item(id, email).replace(updatedUser);
+	const { resource } = await container.item(id, id).replace(updatedUser);
 	return resource!;
 }
 
@@ -88,4 +89,14 @@ export function hasRole(user: User | TokenPayload, role: string): boolean {
 
 export function isAdmin(user: User | TokenPayload): boolean {
 	return user.roles.includes('admin');
+}
+
+export async function authenticate(event: any): Promise<User | null> {
+	const token = event.cookies.get('auth-token');
+	if (!token) return null;
+	
+	const payload = verifyToken(token);
+	if (!payload) return null;
+	
+	return getUserByEmail(payload.email);
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import RichTextEditor from '$lib/components/RichTextEditor.svelte';
+	import DebugError from '$lib/components/DebugError.svelte';
 	
 	export let data;
 	
@@ -13,6 +14,7 @@
 	let featuredImage = data.post.featuredImage || '';
 	let saving = false;
 	let error = '';
+	let debugError: any = null;
 	let shareSuccess = '';
 	let sharing = false;
 	
@@ -39,8 +41,32 @@
 			});
 			
 			if (!response.ok) {
-				const result = await response.json();
-				throw new Error(result.error || 'Failed to update post');
+				// Try to parse as JSON, but handle HTML error pages
+				const contentType = response.headers.get('content-type');
+				let errorMessage = 'Failed to update post';
+				
+				if (contentType && contentType.includes('application/json')) {
+					try {
+						const result = await response.json();
+						errorMessage = result.error || errorMessage;
+					} catch (e) {
+						// JSON parsing failed
+					}
+				} else {
+					// Likely an HTML error page
+					if (response.status === 401) {
+						errorMessage = 'Unauthorized - please log in again';
+						// Redirect to login
+						goto('/auth/login');
+						return;
+					} else if (response.status === 404) {
+						errorMessage = 'API endpoint not found';
+					} else {
+						errorMessage = `Server error (${response.status})`;
+					}
+				}
+				
+				throw new Error(errorMessage);
 			}
 			
 			goto('/admin/posts');
@@ -54,18 +80,79 @@
 	async function handleDelete() {
 		if (!confirm('Are you sure you want to delete this post?')) return;
 		
+		error = '';
+		debugError = null;
+		
 		try {
 			const response = await fetch(`/api/posts/${data.post.slug}`, {
-				method: 'DELETE'
+				method: 'DELETE',
+				headers: {
+					'Content-Type': 'application/json'
+				}
 			});
 			
 			if (!response.ok) {
-				throw new Error('Failed to delete post');
+				// Capture full error details for debugging
+				const contentType = response.headers.get('content-type');
+				let errorMessage = 'Failed to delete post';
+				let errorBody = null;
+				
+				if (contentType && contentType.includes('application/json')) {
+					try {
+						errorBody = await response.json();
+						errorMessage = errorBody.error || errorMessage;
+						
+						// Log additional details if available
+						if (errorBody.details) {
+							console.error('Delete error details:', errorBody.details);
+						}
+					} catch (e) {
+						// JSON parsing failed
+						errorBody = { parseError: e.message };
+					}
+				} else {
+					// Try to get text body
+					try {
+						errorBody = await response.text();
+					} catch (e) {
+						errorBody = 'Could not read response body';
+					}
+					
+					// Likely an HTML error page
+					if (response.status === 401) {
+						errorMessage = 'Unauthorized - please log in again';
+						// Redirect to login
+						goto('/auth/login');
+						return;
+					} else if (response.status === 403) {
+						errorMessage = 'You do not have permission to delete this post';
+					} else if (response.status === 404) {
+						errorMessage = 'Post not found';
+					} else {
+						errorMessage = `Server error (${response.status})`;
+					}
+				}
+				
+				// Create detailed error object
+				const errorObj = new Error(errorMessage);
+				errorObj.status = response.status;
+				errorObj.statusText = response.statusText;
+				errorObj.body = errorBody;
+				errorObj.response = {
+					status: response.status,
+					statusText: response.statusText,
+					url: response.url,
+					headers: Object.fromEntries(response.headers.entries())
+				};
+				throw errorObj;
 			}
 			
+			// Success - redirect to posts list
 			goto('/admin/posts');
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An error occurred';
+			debugError = err;
+			console.error('Delete error:', err);
 		}
 	}
 	
@@ -125,6 +212,8 @@
 			{error}
 		</div>
 	{/if}
+	
+	<DebugError error={debugError} title="Debug Information - Delete Error" />
 	
 	{#if shareSuccess}
 		<div class="success-message">

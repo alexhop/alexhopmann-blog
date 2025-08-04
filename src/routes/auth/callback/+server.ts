@@ -1,9 +1,17 @@
 import type { RequestHandler } from './$types';
 import { config } from '$lib/config';
-import { getUserByEmail, createUser, generateToken } from '$lib/server/auth';
+import { getUserByEmail, createUser, updateUser, generateToken } from '$lib/server/auth';
 import { redirect, error } from '@sveltejs/kit';
+import { isAuthorizedEmail, getAuthorizedUser } from '$lib/server/authorized-users';
+import { authRateLimiter } from '$lib/server/rate-limit';
 
-export const GET: RequestHandler = async ({ url, cookies }) => {
+export const GET: RequestHandler = async (event) => {
+	// Apply rate limiting for auth attempts
+	if (!await authRateLimiter(event)) {
+		redirect(303, '/auth/login?error=rate_limit');
+	}
+	
+	const { url, cookies } = event;
 	const code = url.searchParams.get('code');
 	const errorParam = url.searchParams.get('error');
 	
@@ -18,16 +26,35 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 		// Get user info from token
 		const userInfo = await getUserInfo(tokenResponse.access_token);
 		
+		// Check if user is authorized
+		if (!isAuthorizedEmail(userInfo.email)) {
+			console.warn(`Unauthorized login attempt from: ${userInfo.email}`);
+			redirect(303, '/auth/login?error=unauthorized');
+		}
+		
+		// Get authorized user configuration
+		const authorizedUser = getAuthorizedUser(userInfo.email);
+		if (!authorizedUser) {
+			redirect(303, '/auth/login?error=unauthorized');
+		}
+		
 		// Find or create user
 		let user = await getUserByEmail(userInfo.email);
 		if (!user) {
-			// First time login - create user
+			// First time login - create user with authorized roles
 			user = await createUser({
 				email: userInfo.email,
-				name: userInfo.name || userInfo.email,
-				roles: ['author'], // Default role
+				name: authorizedUser.name || userInfo.name || userInfo.email,
+				roles: authorizedUser.roles,
 				avatar: userInfo.picture
 			});
+		} else {
+			// Update existing user's roles to match authorized configuration
+			if (JSON.stringify(user.roles) !== JSON.stringify(authorizedUser.roles)) {
+				user = await updateUser(user.id, user.email, {
+					roles: authorizedUser.roles
+				});
+			}
 		}
 		
 		// Generate JWT token
@@ -51,6 +78,8 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
 
 async function exchangeCodeForToken(code: string, origin: string) {
 	const authority = config.auth.authority;
+	// Use the configured site URL if available, otherwise fall back to the origin
+	const siteUrl = config.site.url || origin;
 	
 	const response = await fetch(
 		`${authority}/oauth2/v2.0/token`,
@@ -64,7 +93,7 @@ async function exchangeCodeForToken(code: string, origin: string) {
 				client_id: config.auth.clientId,
 				client_secret: config.auth.clientSecret,
 				code: code,
-				redirect_uri: `${origin}/auth/callback`,
+				redirect_uri: `${siteUrl}/auth/callback`,
 				scope: 'openid profile email User.Read'
 			})
 		}

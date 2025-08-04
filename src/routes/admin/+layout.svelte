@@ -1,4 +1,6 @@
 <script lang="ts">
+	import AdminDebugFooter from '$lib/components/AdminDebugFooter.svelte';
+	
 	export let data;
 </script>
 
@@ -9,6 +11,7 @@
 				<a href="/admin" class="logo">Admin Dashboard</a>
 				<div class="nav-links">
 					<a href="/admin/posts">Posts</a>
+					<a href="/admin/pages">Pages</a>
 					<a href="/admin/media">Media</a>
 					<a href="/admin/comments">Comments</a>
 					<a href="/admin/users">Users</a>
@@ -29,6 +32,8 @@
 		</div>
 	</main>
 </div>
+
+<AdminDebugFooter />
 
 <style>
 	.admin-layout {

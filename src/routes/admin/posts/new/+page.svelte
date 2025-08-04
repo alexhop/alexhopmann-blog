@@ -44,8 +44,32 @@
 			});
 			
 			if (!response.ok) {
-				const data = await response.json();
-				throw new Error(data.error || 'Failed to create post');
+				// Try to parse as JSON, but handle HTML error pages
+				const contentType = response.headers.get('content-type');
+				let errorMessage = 'Failed to create post';
+				
+				if (contentType && contentType.includes('application/json')) {
+					try {
+						const data = await response.json();
+						errorMessage = data.error || errorMessage;
+					} catch (e) {
+						// JSON parsing failed
+					}
+				} else {
+					// Likely an HTML error page
+					if (response.status === 401) {
+						errorMessage = 'Unauthorized - please log in again';
+						// Redirect to login
+						goto('/auth/login');
+						return;
+					} else if (response.status === 404) {
+						errorMessage = 'API endpoint not found';
+					} else {
+						errorMessage = `Server error (${response.status})`;
+					}
+				}
+				
+				throw new Error(errorMessage);
 			}
 			
 			const { post } = await response.json();
@@ -83,7 +107,7 @@
 		</div>
 	{/if}
 	
-	<form on:submit|preventDefault={handleSubmit}>
+	<form on:submit|preventDefault={handleSubmit} class:disabled={saving}>
 		<div class="form-group">
 			<label for="title">Title</label>
 			<input
@@ -261,5 +285,10 @@
 	
 	textarea {
 		resize: vertical;
+	}
+	
+	form.disabled {
+		pointer-events: none;
+		opacity: 0.7;
 	}
 </style>

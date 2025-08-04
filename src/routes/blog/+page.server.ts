@@ -1,19 +1,16 @@
 import type { PageServerLoad } from './$types';
+import { getAllPosts } from '$lib/server/posts';
 
-export const load: PageServerLoad = async ({ fetch }) => {
+export const load: PageServerLoad = async () => {
 	try {
-		const response = await fetch('/data/posts.json');
-		if (response.ok) {
-			const data = await response.json();
-			return {
-				posts: data.posts || []
-			};
-		}
+		const posts = await getAllPosts('published');
+		return {
+			posts
+		};
 	} catch (error) {
-		console.error('Error loading posts:', error);
+		console.error('Error loading posts from Cosmos DB:', error);
+		return {
+			posts: []
+		};
 	}
-	
-	return {
-		posts: []
-	};
 };

@@ -17,7 +17,9 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 function getAuthUrl(origin: string): string {
 	const authority = config.auth.authority;
 	const clientId = config.auth.clientId;
-	const redirectUri = encodeURIComponent(`${origin}/auth/callback`);
+	// Use the configured site URL if available, otherwise fall back to the origin
+	const siteUrl = config.site.url || origin;
+	const redirectUri = encodeURIComponent(`${siteUrl}/auth/callback`);
 	const responseType = 'code';
 	const scope = encodeURIComponent('openid profile email User.Read');
 	const responseMode = 'query';

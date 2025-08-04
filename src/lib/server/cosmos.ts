@@ -39,9 +39,9 @@ export async function getContainer(containerName: keyof typeof config.cosmos.con
 		const db = await getDatabase();
 		const containerId = config.cosmos.containers[containerName];
 		
-		const partitionKey = containerName === 'posts' ? '/slug' : 
+		const partitionKey = containerName === 'posts' ? '/id' : 
 						   containerName === 'comments' ? '/postId' : 
-						   '/email';
+						   '/id'; // users container also uses /id
 		
 		const { container } = await db.containers.createIfNotExists({
 			id: containerId,

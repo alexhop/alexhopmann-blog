@@ -60,21 +60,46 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 	}
 	
 	try {
+		console.log(`DELETE request for slug: ${params.slug}`);
+		
 		const post = await getPostBySlug(params.slug);
 		if (!post) {
+			console.error(`Post not found with slug: ${params.slug}`);
 			return json({ error: 'Post not found' }, { status: 404 });
 		}
 		
+		console.log(`Found post to delete - id: ${post.id}, slug: ${post.slug}, title: ${post.title}`);
+		
 		// Check if user owns the post or is admin
 		if (post.author.id !== locals.user.id && !hasRole(locals.user, 'admin')) {
+			console.error(`User ${locals.user.id} not authorized to delete post by ${post.author.id}`);
 			return json({ error: 'Forbidden' }, { status: 403 });
 		}
 		
 		await deletePost(post.id, post.slug);
 		
 		return json({ success: true });
-	} catch (error) {
+	} catch (error: any) {
 		console.error('Error deleting post:', error);
-		return json({ error: 'Failed to delete post' }, { status: 500 });
+		
+		// Return detailed error information
+		const errorResponse = {
+			error: 'Failed to delete post',
+			details: {
+				message: error.message || 'Unknown error',
+				code: error.code,
+				statusCode: error.statusCode,
+				cosmosError: error.body ? JSON.parse(error.body) : null
+			}
+		};
+		
+		// Check for specific Cosmos DB errors
+		if (error.code === 403 || error.statusCode === 403) {
+			errorResponse.error = 'Database access denied - possible firewall issue';
+		} else if (error.code === 404 || error.statusCode === 404) {
+			errorResponse.error = 'Post not found in database';
+		}
+		
+		return json(errorResponse, { status: 500 });
 	}
 };

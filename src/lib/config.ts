@@ -23,5 +23,6 @@ export const config = {
 	},
 	site: {
 		url: process.env.SITE_URL || 'http://localhost:3000'
-	}
+	},
+	authorizedUsers: process.env.AUTHORIZED_USERS || ''
 };
